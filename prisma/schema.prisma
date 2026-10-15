@@ -1,0 +1,202 @@
+// InterviewAI Studio - Prisma schema
+// Postgres (Supabase) + pgvector. Vector columns are declared as Unsupported and are
+// read/written with $queryRaw / $executeRaw in lib/rag.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+// ─────────────────────────────── Enums ───────────────────────────────
+
+enum InterviewPhase {
+  INTRO
+  QUESTION_PROPOSAL
+  CODING_AND_PROBING
+  OPTIMIZATION_CROSS_EXAM
+  DEBRIEF
+  COMPLETED
+}
+
+enum SessionStatus {
+  CREATED
+  LIVE
+  EVALUATING
+  EVALUATED
+  ABANDONED
+}
+
+enum Speaker {
+  CANDIDATE
+  INTERVIEWER
+  CROSS_EXAMINER
+  SYSTEM
+}
+
+enum SnapshotKind {
+  EDIT // periodic debounced snapshot of the editor
+  RUN // candidate ran visible tests
+  SUBMIT // candidate submitted against hidden tests
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Language {
+  PYTHON
+  CPP
+  JAVA
+  JAVASCRIPT
+}
+
+enum Verdict {
+  STRONG_HIRE
+  HIRE
+  LEAN_HIRE
+  LEAN_NO_HIRE
+  NO_HIRE
+}
+
+// ─────────────────────────────── Models ───────────────────────────────
+
+model User {
+  id          String             @id @default(cuid())
+  email       String?            @unique
+  name        String?
+  // Guest users are identified by an httpOnly cookie until they sign in.
+  guestToken  String?            @unique
+  targetLevel String             @default("SDE-2")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  sessions    InterviewSession[]
+}
+
+model Question {
+  id             String             @id @default(cuid())
+  slug           String             @unique
+  title          String
+  difficulty     Difficulty
+  topics         String[]
+  // Markdown problem statement shown to the candidate once the question is proposed.
+  prompt         String
+  // I/O contract (stdin/stdout) so a single test suite works across all languages.
+  inputFormat    String
+  outputFormat   String
+  constraints    String[]
+  // { PYTHON: "...", CPP: "...", JAVA: "...", JAVASCRIPT: "..." }
+  starterCode    Json
+  // [{ input, expected }] shown to the candidate and used by "Run".
+  visibleTests   Json
+  // [{ input, expected, label }] never sent to the client; used by "Submit".
+  hiddenTests    Json
+  // Private interviewer notes: optimal approach, complexity, common traps, probe ideas.
+  referenceNotes String
+  optimalTime    String
+  optimalSpace   String
+  createdAt      DateTime           @default(now())
+  sessions       InterviewSession[]
+}
+
+model InterviewSession {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        Question          @relation(fields: [questionId], references: [id])
+  language        Language          @default(PYTHON)
+  phase           InterviewPhase    @default(INTRO)
+  status          SessionStatus     @default(CREATED)
+  // Append-only log of { from, to, at, reason, actor } transitions for auditability.
+  phaseHistory    Json              @default("[]")
+  // Rolling memory the Cross-Examiner uses to avoid repeating probes.
+  probesAsked     Json              @default("[]")
+  hintsUsed       Int               @default(0)
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  transcript      TranscriptChunk[]
+  snapshots       CodeSnapshot[]
+  report          EvaluationReport?
+
+  @@index([userId, createdAt])
+}
+
+model TranscriptChunk {
+  id         String           @id @default(cuid())
+  sessionId  String
+  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  speaker    Speaker
+  text       String
+  phase      InterviewPhase
+  // Milliseconds since session start; lets the Critic align speech with code edits.
+  offsetMs   Int
+  // Realtime API item id; used to dedupe and to truncate interrupted assistant audio.
+  itemId     String?
+  // True when the interviewer's audio was cut off by a candidate barge-in.
+  interrupted Boolean         @default(false)
+  createdAt  DateTime         @default(now())
+
+  @@index([sessionId, offsetMs])
+}
+
+model CodeSnapshot {
+  id         String           @id @default(cuid())
+  sessionId  String
+  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  kind       SnapshotKind     @default(EDIT)
+  language   Language
+  code       String
+  // Unified diff from the previous snapshot (empty for the first one).
+  diff       String           @default("")
+  offsetMs   Int
+  cursorLine Int?
+  // For RUN / SUBMIT: { passed, total, results: [...], compileOutput, stderr, timeMs, memoryKb }
+  runResult  Json?
+  createdAt  DateTime         @default(now())
+
+  @@index([sessionId, offsetMs])
+}
+
+model EvaluationReport {
+  id               String           @id @default(cuid())
+  sessionId        String           @unique
+  session          InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  verdict          Verdict
+  overallScore     Float
+  // Radar dimensions, 0-10 each.
+  codeCorrectness  Float
+  complexity       Float
+  edgeCases        Float
+  communication    Float
+  speed            Float
+  // Full validated EvaluationSchema payload (see lib/agents/schemas.ts).
+  payload          Json
+  model            String
+  createdAt        DateTime         @default(now())
+}
+
+// Hybrid RAG corpus: OS, DBMS, Networks, DSA, Distributed Systems.
+model KnowledgeChunk {
+  id         String                       @id @default(cuid())
+  domain     String // "os" | "dbms" | "networks" | "dsa" | "distributed"
+  topic      String
+  heading    String
+  content    String
+  tokenCount Int
+  // 1536-dim text-embedding-3-small vector. Index: see prisma/sql/pgvector.sql
+  embedding  Unsupported("vector(1536)")?
+  createdAt  DateTime                     @default(now())
+
+  @@index([domain])
+}
