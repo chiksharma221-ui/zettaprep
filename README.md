@@ -1,72 +1,207 @@
-# InterviewAI Studio
+# 🎙️ InterviewAI Studio
 
-A voice-first, multi-agent technical interview simulator.
+### Your AI-powered technical interview, live.
 
-- **Lead Interviewer** speaks to you through the OpenAI Realtime API (speech-to-speech) and moves through the interview phases with tool calls.
-- **Cross-Examiner** reads every code diff and interrupts with pointed questions, like *"Why `list.pop(0)` on line 18?"*
-- **Evaluation Critic** turns the transcript, code history and hidden-test results into a five-axis report with line-by-line annotations.
-- **Fundamentals Arena**: flashcards plus scenario questions built from hybrid BM25 + pgvector retrieval.
+**A voice-first, multi-agent technical interview simulator that listens, challenges your code, and evaluates how you think.**
 
-Architecture, sequence diagrams and the state machine are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+InterviewAI Studio recreates the experience of a rigorous technical interview with real-time voice conversations, collaborative AI agents, live code analysis, and retrieval-powered computer science questions.
 
-## Stack
-Next.js 14 (App Router, TypeScript) · Tailwind · Framer Motion · Monaco · Recharts · Vercel AI SDK (`generateObject` + Zod) · OpenAI Realtime · Anthropic Claude or OpenAI for the text agents · Prisma + Postgres/pgvector (Supabase) · Judge0 CE · a Node `ws` gateway.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-14-black?logo=next.js" alt="Next.js 14" />
+  <img src="https://img.shields.io/badge/TypeScript-Ready-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/AI-Multi--Agent-8B5CF6" alt="Multi-Agent AI" />
+  <img src="https://img.shields.io/badge/Realtime-Voice-10B981" alt="Realtime Voice" />
+  <img src="https://img.shields.io/badge/Database-PostgreSQL%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL and pgvector" />
+</p>
 
-## Project layout
+---
+
+## ✨ What makes it different?
+
+Most interview-preparation tools ask questions. **InterviewAI Studio challenges your reasoning as you solve them.**
+
+| 🎤 Real-time interviewer | 🧠 Intelligent code challenges |
+|:---|:---|
+| Speech-to-speech conversations powered by the OpenAI Realtime API. | A dedicated agent examines code changes and asks targeted follow-up questions. |
+| 📝 Structured evaluation | 📚 Context-aware fundamentals |
+| A five-axis report with code annotations, transcript insights, and hidden-test results. | Hybrid BM25 + pgvector retrieval for flashcards and scenario-based CS questions. |
+
+## 🚀 Core Features
+
+### 01 · Live Voice Interviewer
+
+- Natural speech-to-speech interaction using the OpenAI Realtime API.
+- Tool-driven interview progression across different interview phases.
+- Real-time audio capture, playback, and session management.
+- A dedicated WebSocket gateway connecting the voice experience to backend services.
+
+### 02 · Multi-Agent Interview System
+
+Multiple specialized agents collaborate to simulate a more demanding technical interview.
+
+- **Lead Interviewer** — manages the conversation, interview pacing, and phase transitions.
+- **Cross-Examiner** — inspects code diffs and challenges implementation choices with targeted questions.
+- **Evaluation Critic** — evaluates the transcript, code history, and hidden-test results to generate a structured report.
+- **Hint Agent** — supports the interview workflow with contextual guidance.
+
+### 03 · Live Coding Environment
+
+- Monaco Editor for an integrated coding experience.
+- Dynamic code review based on submitted changes.
+- Judge0 CE integration for code execution and test evaluation.
+- Visible and hidden test suites for evaluating correctness.
+
+### 04 · AI-Powered Evaluation
+
+Turn an interview session into actionable feedback.
+
+- Five-axis performance report.
+- Line-by-line code annotations.
+- Evaluation of time complexity, edge cases, and communication.
+- Radar-chart visualization of performance.
+- Structured output validation using Pydantic and Zod schemas.
+
+### 05 · Fundamentals Arena
+
+Strengthen computer science fundamentals with retrieval-grounded practice.
+
+- Flashcards and scenario-based questions.
+- Hybrid retrieval combining BM25 keyword search and pgvector semantic search.
+- Reciprocal Rank Fusion (RRF) to combine retrieval results.
+- Knowledge-base indexing and embedding generation.
+
+---
+
+## 🏗️ Architecture
+
+The application combines a Next.js frontend, a real-time voice gateway, specialized AI agents, code execution, and a PostgreSQL-backed retrieval system.
+
+```mermaid
+flowchart TD
+    U[Candidate] --> UI[Next.js Interview UI]
+    UI --> H[Interview Session Hook]
+    H <--> GW[Node.js WebSocket Gateway]
+
+    GW <--> RT[OpenAI Realtime API]
+    GW --> SM[Interview State Machine]
+    SM --> LI[Lead Interviewer]
+    SM --> CE[Cross-Examiner]
+    SM --> EC[Evaluation Critic]
+
+    CE --> J0[Judge0 Code Execution]
+    EC --> DB[(PostgreSQL)]
+    LI --> DB
+
+    UI --> AR[Fundamentals Arena]
+    AR --> HR[Hybrid Retrieval]
+    HR --> BM[BM25]
+    HR --> PG[pgvector]
+    BM --> HR
+    PG --> HR
+    HR --> DB
 ```
-app/                      Next.js routes (home, interview room, report, arena, API)
-components/interview/     InterviewRoom, SplitPane, AudioVisualizer, AIAvatar, StatusIndicator, CodeEditor, TestConsole…
-components/report/        ReportView, RadarPanel, AnnotatedCode
-components/arena/         Flashcards + RAG deep-dive
-hooks/                    useInterviewSession (WS + audio engine), useAudioVisualizer
-lib/agents/               prompts.ts, schemas.ts (Zod), realtime-tools.ts, cross-examiner, critic, hint, arena
-lib/interview/            state-machine.ts (+ tests), protocol.ts, ticket.ts, question.ts
-lib/rag/                  bm25.ts, fusion.ts (RRF), embeddings.ts, hybrid.ts, chunker.ts
-lib/judge0/               batch execution client
-lib/audio/                MicCapture (AudioWorklet), PcmPlayer (gapless + truncation)
-server/gateway.ts         Realtime WebSocket gateway (voice ↔ agents ↔ Judge0 ↔ DB)
-prisma/                   schema.prisma, seed.ts, index-knowledge.ts, seed-data/questions.json
-content/                  knowledge base (markdown) + flashcard decks
-public/worklets/          pcm-capture.js AudioWorklet
+
+For the detailed architecture, sequence diagrams, and state-machine design, see **[Architecture Documentation](docs/ARCHITECTURE.md)**.
+
+## 🧰 Tech Stack
+
+| Layer | Technologies |
+|:---|:---|
+| Frontend | Next.js 14, React, TypeScript, Tailwind CSS, Framer Motion |
+| Code editor & visualization | Monaco Editor, Recharts |
+| Voice & communication | OpenAI Realtime API, WebRTC, WebSocket, AudioWorklet |
+| AI orchestration | LangGraph, Vercel AI SDK, Zod |
+| Language models | OpenAI, Anthropic Claude |
+| Backend | Node.js, FastAPI, Server-Sent Events (SSE) |
+| Retrieval & embeddings | BM25, RRF, OpenAI embeddings |
+| Database | PostgreSQL, Prisma ORM, pgvector, Supabase |
+| Code execution | Judge0 CE |
+| Validation | Pydantic, Zod |
+| Testing & tooling | GitHub Actions, TypeScript, unit tests |
+
+## 📂 Project Structure
+
+```text
+app/                  Next.js routes and API endpoints
+components/
+  arena/              Fundamentals Arena UI
+  interview/          Interview room, editor, audio and status UI
+  report/              Evaluation report and code annotations
+hooks/                 Interview session and audio visualization
+lib/
+  agents/              Agent prompts, schemas and orchestration
+  audio/               Microphone capture and PCM playback
+  interview/           State machine, protocol and session tickets
+  judge0/               Code execution client
+  rag/                  BM25, embeddings, fusion and chunking
+prisma/                Database schema, seeds and indexing scripts
+content/               Knowledge base and flashcard content
+public/worklets/       AudioWorklet processors
+server/gateway.ts      Real-time WebSocket gateway
+docs/                  Architecture and design documentation
 ```
 
-## Setup (Windows, macOS or Linux)
+## ⚙️ Getting Started
 
-Requirements: Node 20+, a Postgres with pgvector (Supabase or the bundled `docker-compose.yml`), an OpenAI API key with Realtime access, optionally an Anthropic key, and a Judge0 endpoint.
+### Prerequisites
+
+- Node.js 20+
+- npm
+- PostgreSQL with the `pgvector` extension, or Docker Compose
+- OpenAI API key with Realtime API access
+- Judge0 CE endpoint
+- Optional: Anthropic API key
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/chiksharma221-ui/zettaprep.git
+cd zettaprep
+```
+
+### 2. Install dependencies
 
 ```bash
 npm install
-cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
-# fill in DATABASE_URL, DIRECT_URL, OPENAI_API_KEY, ANTHROPIC_API_KEY, JUDGE0_*, GATEWAY_SECRET
 ```
 
-**Database**
-- Local: `docker compose up -d` (Postgres 16 + pgvector on :5432; the defaults in `.env.example` already point at it).
-- Supabase: enable the `vector` extension (Database → Extensions), then use the pooled connection string for `DATABASE_URL` and the direct one for `DIRECT_URL`.
+### 3. Configure environment variables
+
+Create a local environment file from the example:
+
+**Windows PowerShell**
+```powershell
+Copy-Item .env.example .env
+```
+
+**macOS / Linux**
+```bash
+cp .env.example .env
+```
+
+Configure the required values in `.env`, including:
+
+```dotenv
+DATABASE_URL=
+DIRECT_URL=
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GATEWAY_SECRET=
+JUDGE0_URL=
+JUDGE0_API_KEY=
+JUDGE0_API_HOST=
+```
+
+Use the appropriate values for your database, AI provider, gateway, and Judge0 deployment. Keep all credentials private.
+
+### 4. Start the database
+
+For the bundled PostgreSQL and pgvector setup:
 
 ```bash
-npx prisma db push            # creates tables + vector extension
-npm run db:seed               # 4 problems, each with visible and hidden test suites
-npm run db:index              # chunks + embeds the CS knowledge base, builds the HNSW index
+docker compose up -d
 ```
 
-**Judge0**
-- RapidAPI: set `JUDGE0_URL=https://judge0-ce.p.rapidapi.com`, plus `JUDGE0_API_KEY` and `JUDGE0_API_HOST`.
-- Self-hosted: follow the Judge0 CE deployment guide, set `JUDGE0_URL=http://localhost:2358`, and leave the key empty.
+Alternatively, configure a PostgreSQL database through Supabase and enable the `vector` extension.
 
-**Run**
-```bash
-npm run dev                   # Next.js on :3000 and the gateway on :3001
-```
-Open http://localhost:3000, choose a problem, and put on headphones (otherwise the interviewer can hear itself through your speakers).
-
-```bash
-npm test                      # state machine + BM25/RRF unit tests
-npm run typecheck
-```
-
-## Production notes
-- Deploy the gateway as its own long-running service (Fly.io, Railway, ECS…) behind TLS, and set `NEXT_PUBLIC_GATEWAY_URL=wss://…`. Use the same `GATEWAY_SECRET` and `DATABASE_URL` for both the web app and the gateway.
-- Users are guest identities bound to an httpOnly cookie (`lib/user.ts`). To add real accounts, swap `currentUser()` for your auth provider (NextAuth, Clerk or Supabase Auth); `User.email` is already in the schema.
-- The text agents use `AGENT_PROVIDER` (`anthropic` or `openai`). Set the model ids with `ANTHROPIC_MODEL` / `OPENAI_AGENT_MODEL`.
-- Prompts are versioned (`PROMPT_VERSION` in `lib/agents/prompts.ts`), and every report stores the version that produced it.
+### 5. Initialize
